@@ -4,19 +4,13 @@ import datetime
 
 import subprocess
 import logging
-import sys
 import requests
 
 from domain_list import DomainList
 from config import Config
 
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', datefmt='%H:%M:%S')
 logger = logging.getLogger()
-logger.setLevel(logging.INFO)
-handler = logging.StreamHandler(sys.stdout)
-handler.setFormatter(
-    logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
-)
-logger.addHandler(handler)
 
 config = Config("./config.yaml")
 
@@ -82,7 +76,7 @@ def read_and_delete_file(path):
     logger.info(f"Reading and deleting file: {path}")
     with open(path, "r") as file:
         contents = file.read()
-    # os.remove(path)
+    os.remove(path)
     return contents
 
 
@@ -110,10 +104,11 @@ def provision_cert(email, lineage, domains):
 
     logger.info(f"Executing command: {' '.join(params)}")
 
-    try:
-        subprocess.check_output(params, stderr=subprocess.STDOUT, shell=True)
-    except subprocess.CalledProcessError as e:
-        raise e
+    subp = subprocess.run(params, capture_output=True)
+    if subp.returncode!= 0:
+        raise Exception(subp.stderr.decode("utf-8").replace("\\n", "\n"))
+    
+    logger.info(f"Certbot command executed successfully with result: {subp.stdout.decode('utf-8').replace('\\n', '\n')}")
 
     path = "/tmp/config-dir/live/" + lineage + "/"
     return {
