@@ -108,7 +108,8 @@ def provision_cert(email, lineage, domains):
     if subp.returncode!= 0:
         raise Exception(subp.stderr.decode("utf-8").replace("\\n", "\n"))
     
-    logger.info(f"Certbot command executed successfully with result: {subp.stdout.decode('utf-8').replace('\\n', '\n')}")
+    stdout_output = subp.stdout.decode('utf-8').replace("\\n", "\n")
+    logger.info(f"Certbot command executed successfully with result: {stdout_output}")
 
     path = "/tmp/config-dir/live/" + lineage + "/"
     return {
