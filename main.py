@@ -72,11 +72,10 @@ def get_challenge():
         return ["--nginx"]
 
 
-def read_and_delete_file(path):
-    logger.info(f"Reading and deleting file: {path}")
+def read_file(path):
+    logger.info(f"Reading file: {path}")
     with open(path, "r") as file:
         contents = file.read()
-    os.remove(path)
     return contents
 
 
@@ -90,15 +89,10 @@ def provision_cert(email, lineage, domains):
         "certbot",
         "certonly",
         "-n",  # non-interactive
+        "--reinstall", # always reinstall, provision_cert triggered if AWS ACM expiring
         "--agree-tos",
         "--email",
-        email,
-        "--config-dir",
-        "/tmp/config-dir/",
-        "--work-dir",
-        "/tmp/work-dir/",
-        "--logs-dir",
-        "/tmp/logs-dir/",
+        email
     ] + domain_args
     params += get_challenge()
 
@@ -111,11 +105,11 @@ def provision_cert(email, lineage, domains):
     stdout_output = subp.stdout.decode('utf-8').replace("\\n", "\n")
     logger.info(f"Certbot command executed successfully with result: {stdout_output}")
 
-    path = "/tmp/config-dir/live/" + lineage + "/"
+    path = "/etc/letsencrypt/live/" + lineage + "/"
     return {
-        "certificate": read_and_delete_file(path + "cert.pem"),
-        "private_key": read_and_delete_file(path + "privkey.pem"),
-        "certificate_chain": read_and_delete_file(path + "chain.pem"),
+        "certificate": read_file(path + "cert.pem"),
+        "private_key": read_file(path + "privkey.pem"),
+        "certificate_chain": read_file(path + "chain.pem"),
     }
 
 
