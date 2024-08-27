@@ -1,20 +1,21 @@
 class DomainList:
     def __init__(self, domains):
         self.original = domains
-        self.lineage = self.parse(domains)
+        self.parsed = self.parse(domains)
 
     def parse(self, domains):
         result = {}
-        for domain in domains:
+        for item in domains:
+            domain = item['domain']
+            resolver = item['resolver']
+            result.setdefault(resolver, {})
             lineage = self.choose_lineagename(domain.strip())
-            if lineage in result:
-                result[lineage].append(domain.strip())
-            else:
-                result[lineage] = [domain.strip()]
+            result.get(resolver).setdefault(lineage, [])
+            result.get(resolver).get(lineage).append(domain.strip())
         return result
 
     def is_wildcard_domain(self, domain):
-        wildcard_marker: Union[Text, bytes] = b"*."
+        wildcard_marker = b"*."
         if isinstance(domain, str):
             wildcard_marker = u"*."
         return domain.startswith(wildcard_marker)

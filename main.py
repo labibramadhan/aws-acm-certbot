@@ -53,24 +53,28 @@ def send_mattermost_notification(message, webhook_url):
             logger.error(f"Failed to send Mattermost notification: {e}")
 
 
-def get_challenge():
-    if config.get("cloudflare_token") is not None:
-        logger.info("Cloudflare configuration detected")
-        with open("/tmp/cloudflare.ini", "w") as file:
-            file.write("dns_cloudflare_api_token = " + config.get("cloudflare_token"))
-            chmod_digit("/tmp/cloudflare.ini", 600)
+def get_challenge(resolver):
+    if resolver == "cloudflare":
+        if config.get("cloudflare_token") is not None:
+            logger.info("Cloudflare configuration detected")
+            with open("/tmp/cloudflare.ini", "w") as file:
+                file.write("dns_cloudflare_api_token = " + config.get("cloudflare_token"))
+                chmod_digit("/tmp/cloudflare.ini", 600)
 
-        return [
-            "--dns-cloudflare",
-            "--dns-cloudflare-propagation-seconds",
-            "60",
-            "--dns-cloudflare-credentials",
-            "/tmp/cloudflare.ini",
-        ]
-    else:
+            return [
+                "--dns-cloudflare",
+                "--dns-cloudflare-propagation-seconds",
+                "60",
+                "--dns-cloudflare-credentials",
+                "/tmp/cloudflare.ini",
+            ]
+        else:
+            raise Exception("Cloudflare token not found in configuration")
+    elif resolver == "nginx":
         logger.info("Using nginx for challenge")
         return ["--nginx"]
-
+    else:
+        raise Exception(f"Unsupported resolver: {resolver}")
 
 def read_file(path):
     logger.info(f"Reading file: {path}")
@@ -79,8 +83,8 @@ def read_file(path):
     return contents
 
 
-def provision_cert(email, lineage, domains):
-    logger.info(f"Attempting to provision cert for: ({lineage}) {domains}")
+def provision_cert(email, lineage, domains, resolver):
+    logger.info(f"[{resolver}] Attempting to provision cert for: ({lineage}) {domains}")
     domain_args = []
     for domain in domains:
         domain_args.extend(["-d", domain])
@@ -94,7 +98,7 @@ def provision_cert(email, lineage, domains):
         "--email",
         email
     ] + domain_args
-    params += get_challenge()
+    params += get_challenge(resolver)
 
     logger.info(f"Executing command: {' '.join(params)}")
 
@@ -121,12 +125,16 @@ def should_provision(domains):
         not_after = existing_cert["Certificate"]["NotAfter"]
         expiry = (not_after - now).days
         cutoff = conf_days_before_expiry
-        message = f"Existing cert found for {', '.join(domains)} in ACM region {aws_region} with expiry ({expiry}) <= cutoff ({cutoff}), no need to renew"
+        should_renew = expiry <= cutoff
+        if should_renew:
+            message = f"Renewing existing cert found for {', '.join(domains)} in ACM region {aws_region} with expiry ({expiry}) <= cutoff ({cutoff})"
+        else:
+            message = f"Skipping renewal for existing cert found for {', '.join(domains)} in ACM region {aws_region} with expiry ({expiry}) > cutoff ({cutoff})"
         logger.info(message)
         send_mattermost_info_notification(message)
-        return expiry <= cutoff
+        return should_renew
     else:
-        logger.info("No existing cert found, provisioning new one")
+        logger.info("Requesting to provision new cert for domains: {domains}")
         return True
 
 
@@ -189,11 +197,11 @@ def upload_cert_to_acm(cert, domains):
     return True
 
 
-def process_lineage(lineage, domains, email):
+def process_lineage(resolver, lineage, domains, email):
     try:
         logger.info(f"Processing: ({lineage}) {domains}")
         if should_provision(domains):
-            cert = provision_cert(email, lineage, domains)
+            cert = provision_cert(email, lineage, domains, resolver)
             upload_cert_to_acm(cert, domains)
     except Exception as e:
         error_message = e
@@ -211,5 +219,6 @@ def process_lineage(lineage, domains, email):
 
 
 logger.info(f"Processing domain list: {domain_list.original}")
-for lineage, domains in domain_list.lineage.items():
-    process_lineage(lineage, domains, conf_domain_email)
+for resolver, domains_by_lineage in domain_list.parsed.items():
+    for lineage, domains in domains_by_lineage.items():
+        process_lineage(resolver, lineage, domains, conf_domain_email)

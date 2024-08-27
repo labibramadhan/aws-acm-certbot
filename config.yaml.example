@@ -2,15 +2,22 @@ aws_access_key_id:
 aws_secret_access_key:
 aws_region: ap-southeast-1
 
+cloudflare_token: mycloudflaretokenxyz123
+
 domain_email: mail@gmail.com
 days_before_expiry: 10
 domain_list:
-  - domain1.com
-  - sub.domain1.com
-  - sub.anotherdomain.com
+  - resolver: 'nginx'
+    domain: 'domain1.com'
+  - resolver: 'nginx'
+    domain: 'sub.domain1.com'
+  - resolver: 'nginx'
+    domain: 'sub.anotherdomain.com'
+  - resolver: 'cloudflare'
+    domain: '*.api.anotherdomain.com'
 
 error_notification:
   mattermost_webhook_url:
-  
+
 info_notification:
   mattermost_webhook_url:
