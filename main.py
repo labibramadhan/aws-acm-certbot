@@ -87,7 +87,7 @@ def provision_cert(email, lineage, domains, resolver):
     logger.info(f"[{resolver}] Attempting to provision cert for: ({lineage}) {domains}")
     domain_args = []
     for domain in domains:
-        domain_args.extend(["-d", domain])
+        domain_args.extend(["-d", f'"{domain}"'])
 
     params = [
         "certbot",
